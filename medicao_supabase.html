@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Medições — EL Imóveis</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+var editClienteId = null;
+
+function abrirEditar(cid){
+  var c=clientes.find(x=>x.id==cid);if(!c)return;
+  editClienteId=cid;
+  document.getElementById('ed-nome').value=c.nome;
+  document.getElementById('ed-fin').value=c.financiado||0;
+  document.getElementById('ed-custas').value=c.custas||0;
+  document.getElementById('ed-agencia').value=c.agencia||'';
+  document.getElementById('ed-data').value=c.data||'';
+  document.getElementById('ed-mes').value=c.mes_previsto||'';
+  // build etapas grid
+  var g=document.getElementById('ed-etapas-grid');
+  g.innerHTML='';
+  var etapas=c.etapas||[];
+  for(var i=0;i<11;i++){
+    g.innerHTML+='<div class="etapa-item"><label>% Etapa '+(i+1)+'</label><input type="number" id="ed-et-'+i+'" value="'+(etapas[i]||0)+'" step="0.01" oninput="calcEdEtapas()"><div class="etapa-valor" id="ed-val-'+i+'">—</div></div>';
+  }
+  calcEdEtapas();
+  document.getElementById('modal-editar').classList.add('show');
+}
+
+function fecharModal(){
+  document.getElementById('modal-editar').classList.remove('show');
+  editClienteId=null;
+}
+
+function calcEdEtapas(){
+  var fin=parseFloat(document.getElementById('ed-fin').value)||0;
+  var total=0;
+  for(var i=0;i<11;i++){
+    var pct=parseFloat((document.getElementById('ed-et-'+i)||{}).value)||0;
+    total+=pct;
+    var el=document.getElementById('ed-val-'+i);
+    if(el){el.textContent=pct>0&&fin>0?fmtBRL(fin*pct/100):'—';el.style.color=pct>0?'#1a7a4a':'#888781';}
+  }
+  var info=document.getElementById('ed-pct-info');if(!info)return;
+  var fin2=parseFloat(document.getElementById('ed-fin').value)||0;
+  var cls=Math.abs(total-100)<0.1?'ok':total>100?'err':'info';
+  info.innerHTML='<div class="pct-total '+cls+'">Total: '+fmtPct(total)+' · Total a pedir: '+fmtBRL(fin2*total/100)+'</div>';
+}
+
+async function salvarEdicao(){
+  var etapas=[];
+  for(var i=0;i<11;i++)etapas.push(parseFloat((document.getElementById('ed-et-'+i)||{}).value)||0);
+  var upd={
+    agencia:document.getElementById('ed-agencia').value.trim().toUpperCase(),
+    data:document.getElementById('ed-data').value||null,
+    mes_previsto:document.getElementById('ed-mes').value||null,
+    financiado:parseFloat(document.getElementById('ed-fin').value)||0,
+    custas:parseFloat(document.getElementById('ed-custas').value)||0,
+    etapas:etapas
+  };
+  var {error}=await sb.from('clientes').update(upd).eq('id',editClienteId);
+  if(error){showToast('Erro: '+error.message);return;}
+  fecharModal();showToast('✓ Cliente atualizado');
+}
+
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a18;font-size:14px;}
+.header{background:#1F4E78;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header h1{font-size:16px;font-weight:600;}
+.header span{font-size:12px;opacity:0.7;}
+.user-badge{background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;}
+.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.login-box{background:#fff;border-radius:12px;padding:32px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.login-box h2{font-size:18px;font-weight:600;margin-bottom:6px;color:#1F4E78;}
+.login-box p{font-size:13px;color:#6b6a65;margin-bottom:24px;}
+.login-roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.role-btn{padding:14px 10px;border:2px solid #e0dfd8;border-radius:8px;cursor:pointer;text-align:center;background:#fff;transition:all 0.15s;}
+.role-btn:hover{border-color:#1F4E78;background:#f0f4f9;}
+.role-btn.selected{border-color:#1F4E78;background:#f0f4f9;}
+.role-btn i{font-size:22px;display:block;margin-bottom:6px;color:#1F4E78;}
+.role-btn span{font-size:12px;font-weight:600;display:block;color:#1a1a18;}
+.role-btn small{font-size:11px;color:#6b6a65;}
+.btn-entrar{width:100%;background:#1F4E78;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+.btn-entrar:hover{background:#17406a;}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e0dfd8;overflow-x:auto;}
+.tab{padding:12px 16px;font-size:13px;cursor:pointer;border:none;background:none;color:#6b6a65;border-bottom:2px solid transparent;white-space:nowrap;}
+.tab.active{color:#1F4E78;border-bottom-color:#1F4E78;font-weight:600;}
+.tab:hover:not(.active){background:#f9f9f6;color:#1a1a18;}
+.screen{display:none;padding:16px;max-width:1200px;margin:0 auto;}
+.screen.active{display:block;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
+.kpi{background:#fff;border-radius:8px;padding:14px 16px;border:1px solid #e0dfd8;}
+.kpi-label{font-size:11px;color:#888781;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+.kpi-value{font-size:20px;font-weight:600;}
+.kpi-value.blue{color:#1F4E78;}
+.kpi-value.green{color:#1a7a4a;}
+.kpi-value.orange{color:#b86000;}
+.filter-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+.filter-row input,.filter-row select{font-size:12px;padding:6px 10px;border:1px solid #d0cfc8;border-radius:6px;background:#fff;color:#1a1a18;min-width:120px;}
+.table-wrap{overflow-x:auto;border:1px solid #e0dfd8;border-radius:8px;background:#fff;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:9px 10px;font-size:11px;font-weight:600;color:#888781;border-bottom:1px solid #e0dfd8;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;background:#fafaf7;}
+td{padding:9px 10px;border-bottom:1px solid #f0efe8;color:#1a1a18;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fafaf7;}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap;}
+.badge.green{background:#e4f5ec;color:#1a7a4a;}
+.badge.orange{background:#fef3e2;color:#b86000;}
+.badge.red{background:#fce8e8;color:#c02020;}
+.badge.gray{background:#f0efe8;color:#6b6a65;border:1px solid #e0dfd8;}
+.pct-bar{width:60px;height:5px;background:#e8e7e0;border-radius:99px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px;}
+.pct-fill{height:100%;border-radius:99px;background:#1F4E78;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-full{grid-column:1/-1;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+label{font-size:12px;color:#52514e;font-weight:600;}
+input,select{font-size:13px;padding:8px 10px;border:1px solid #d0cfc8;border-radius:6px;background:#fff;color:#1a1a18;width:100%;}
+input:focus,select:focus{outline:none;border-color:#1F4E78;box-shadow:0 0 0 3px rgba(31,78,120,0.1);}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.btn-primary{background:#1F4E78;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-primary:hover{background:#17406a;}
+.btn-secondary{background:#fff;color:#1a1a18;border:1px solid #d0cfc8;padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;}
+.btn-secondary:hover{background:#f5f5f0;}
+.btn-sm{padding:4px 10px;font-size:11px;}
+.section-title{font-size:13px;font-weight:600;color:#52514e;margin-bottom:10px;}
+.info-box{background:#f0f4f9;border:1px solid #c5d7eb;border-radius:6px;padding:10px 14px;font-size:12px;color:#3a5a78;line-height:1.7;}
+.etapas-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;}
+.etapa-item{display:flex;flex-direction:column;gap:3px;}
+.etapa-valor{font-size:11px;color:#1a7a4a;font-weight:600;margin-top:2px;min-height:16px;}
+.pct-total{font-size:12px;margin-top:8px;padding:6px 10px;border-radius:6px;}
+.pct-total.ok{background:#e4f5ec;color:#1a7a4a;}
+.pct-total.err{background:#fce8e8;color:#c02020;}
+.pct-total.info{background:#f0efe8;color:#6b6a65;}
+.toast{position:fixed;bottom:20px;right:20px;background:#1F4E78;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+.toast.show{opacity:1;}
+.loading{text-align:center;padding:40px;color:#888781;font-size:13px;}
+.alerta{color:#c02020;font-weight:600;}
+.empty{text-align:center;padding:36px;color:#888781;font-size:13px;}
+.realtime-dot{width:8px;height:8px;background:#4ade80;border-radius:50%;display:inline-block;margin-right:6px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr;}
+  .form-full{grid-column:1;}
+  .etapas-grid{grid-template-columns:repeat(2,1fr);}
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:9998;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:10px;padding:24px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:18px;color:#1F4E78;}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;border-top:1px solid #e0dfd8;padding-top:14px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2><i class="ti ti-building"></i> EL Imóveis</h2>
+    <p>Controle de Medições — Selecione seu perfil para entrar</p>
+    <div class="login-roles">
+      <div class="role-btn" onclick="selecionarPerfil('elaine')" id="role-elaine">
+        <i class="ti ti-user-star"></i>
+        <span>Elaine</span>
+        <small>Gestora</small>
+      </div>
+      <div class="role-btn" onclick="selecionarPerfil('engenharia')" id="role-engenharia">
+        <i class="ti ti-tools"></i>
+        <span>Engenharia</span>
+        <small>Medições</small>
+      </div>
+      <div class="role-btn" onclick="selecionarPerfil('marindia')" id="role-marindia">
+        <i class="ti ti-cash"></i>
+        <span>Marindia</span>
+        <small>Recebimentos</small>
+      </div>
+      <div class="role-btn" onclick="selecionarPerfil('visualizador')" id="role-visualizador">
+        <i class="ti ti-eye"></i>
+        <span>Visualizar</span>
+        <small>Somente leitura</small>
+      </div>
+    </div>
+    <button class="btn-entrar" onclick="entrar()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="header">
+  <div class="header-left">
+    <i class="ti ti-building" style="font-size:22px"></i>
+    <div>
+      <h1>Controle de Medições</h1>
+      <span><span class="realtime-dot"></span>Tempo real</span>
+    </div>
+  </div>
+  <div class="user-badge" onclick="sair()" id="user-badge">👤 —</div>
+</div>
+
+<div class="tabs" id="tabs-container"></div>
+
+<!-- RESUMO -->
+<div id="tab-resumo" class="screen active">
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Total financiado</div><div class="kpi-value" id="kpi-fin">—</div></div>
+    <div class="kpi"><div class="kpi-label">Total recebido</div><div class="kpi-value green" id="kpi-rec">—</div></div>
+    <div class="kpi"><div class="kpi-label">% recebido</div><div class="kpi-value blue" id="kpi-pct">—</div></div>
+    <div class="kpi"><div class="kpi-label">Falta receber</div><div class="kpi-value orange" id="kpi-falta">—</div></div>
+    <div class="kpi"><div class="kpi-label">Clientes</div><div class="kpi-value" id="kpi-total">—</div></div>
+  </div>
+  <div class="filter-row">
+    <input type="text" id="busca-resumo" placeholder="Buscar cliente..." oninput="renderResumo()">
+    <input type="month" id="filtro-mes-resumo" oninput="renderResumo()">
+    <select id="filtro-st-resumo" onchange="renderResumo()">
+      <option value="">Todos</option>
+      <option value="andamento">Em andamento</option>
+      <option value="concluido">Concluído</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cliente</th><th>Agência</th><th>Assinatura</th><th>Mês previsto</th><th>Financiado</th><th>Custas</th><th>Recebido</th><th>%</th><th>Falta</th><th></th></tr></thead>
+      <tbody id="tbody-resumo"><tr><td colspan="9" class="loading">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- FLUXO -->
+<div id="tab-fluxo" class="screen">
+  <div class="filter-row">
+    <input type="text" id="busca-fluxo" placeholder="Buscar cliente..." oninput="renderFluxo()">
+    <select id="filtro-st-fluxo" onchange="renderFluxo()">
+      <option value="">Todos os status</option>
+      <option value="Aguardando Engenharia">Aguardando engenharia</option>
+      <option value="Aguardando Recebimento">Aguardando recebimento</option>
+      <option value="Recebido">Recebido</option>
+    </select>
+    <input type="month" id="filtro-mes-fluxo" oninput="renderFluxo()">
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cliente</th><th>Mês previsto</th><th>Data Elaine</th><th>Data engenharia</th><th>Data recebimento</th><th>Valor recebido</th><th>% total</th><th>Status</th><th></th></tr></thead>
+      <tbody id="tbody-fluxo"><tr><td colspan="9" class="loading">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CADASTRO -->
+<div id="tab-cadastro" class="screen">
+  <div class="filter-row">
+    <input type="text" id="busca-cad" placeholder="Buscar cliente..." oninput="renderCadastro()">
+    <button class="btn-primary" onclick="showTab('novo-cliente')"><i class="ti ti-user-plus"></i> Novo cliente</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cliente</th><th>Agência</th><th>Assinatura</th><th>Mês previsto</th><th>Financiado</th><th>Custas</th><th>Total a pedir</th><th>Etapas</th></tr></thead>
+      <tbody id="tbody-cad"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- NOVO PEDIDO -->
+<div id="tab-novo-pedido" class="screen">
+  <div class="section-title">Registrar pedido de medição</div>
+  <div class="form-grid">
+    <div class="form-group form-full">
+      <label>Cliente</label>
+      <select id="np-cliente" onchange="preencherInfoCliente()"><option value="">Selecione...</option></select>
+    </div>
+    <div class="form-group" id="campo-data-elaine">
+      <label>Data que pedi (Elaine)</label>
+      <input type="date" id="np-data-elaine">
+    </div>
+    <div class="form-group">
+      <label>Mês previsto recebimento</label>
+      <input type="month" id="np-mes-previsto">
+    </div>
+    <div class="form-group" id="campo-data-eng">
+      <label>Data engenharia pediu</label>
+      <input type="date" id="np-data-eng">
+    </div>
+    <div class="form-group" id="campo-data-rec">
+      <label>Data recebimento</label>
+      <input type="date" id="np-data-rec">
+    </div>
+    <div class="form-group" id="campo-valor">
+      <label>Valor recebido (R$)</label>
+      <input type="number" id="np-valor" placeholder="0,00" step="0.01">
+    </div>
+    <div class="form-group form-full" id="np-info-box" style="display:none;">
+      <div class="info-box" id="np-info-txt"></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn-secondary" onclick="showTab('fluxo')">Cancelar</button>
+    <button class="btn-primary" onclick="salvarPedido()" id="btn-salvar-pedido">Salvar pedido</button>
+  </div>
+</div>
+
+<!-- NOVO CLIENTE -->
+<div id="tab-novo-cliente" class="screen">
+  <div class="section-title">Cadastrar novo cliente</div>
+  <div class="form-grid">
+    <div class="form-group form-full">
+      <label>Nome do cliente</label>
+      <input type="text" id="nc-nome" placeholder="Ex: 136 JOAO DA SILVA (MIRASSOL)">
+    </div>
+    <div class="form-group">
+      <label>Data assinatura</label>
+      <input type="date" id="nc-data">
+    </div>
+    <div class="form-group">
+      <label>Mês previsto conclusão</label>
+      <input type="month" id="nc-mes">
+    </div>
+    <div class="form-group">
+      <label>Agência</label>
+      <input type="text" id="nc-agencia" placeholder="Ex: ANDALO">
+    </div>
+    <div class="form-group">
+      <label>Valor financiado (R$)</label>
+      <input type="number" id="nc-fin" placeholder="0,00" step="0.01" oninput="calcEtapas()">
+    </div>
+    <div class="form-group">
+      <label>Custas (R$)</label>
+      <input type="number" id="nc-custas" placeholder="0,00" step="0.01">
+    </div>
+    <div class="form-full">
+      <div class="section-title">% por etapa</div>
+      <div class="etapas-grid" id="etapas-grid"></div>
+      <div id="pct-info"></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn-secondary" onclick="showTab('cadastro')">Cancelar</button>
+    <button class="btn-primary" onclick="salvarCliente()">Cadastrar cliente</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA_URL = 'https://bzgyojuijwtmsuyxlvqj.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6Z3lvanVpand0bXN1eXhsdnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4OTY5OTgsImV4cCI6MjEwMDQ3Mjk5OH0.nuTX5WCbIL7yKVDpjOQ5GgrS-2VHmoK5X0S380iSqRU';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+var PERFIL = null;
+var clientes = [];
+var pedidos = [];
+
+var PERFIS = {
+  elaine: { nome:'Elaine', tabs:['resumo','fluxo','cadastro','novo-pedido','novo-cliente'], icone:'👩‍💼' },
+  engenharia: { nome:'Engenharia', tabs:['fluxo','novo-pedido'], icone:'🔧' },
+  marindia: { nome:'Marindia', tabs:['fluxo','novo-pedido'], icone:'💰' },
+  visualizador: { nome:'Visualizador', tabs:['resumo','fluxo'], icone:'👁️' }
+};
+
+function selecionarPerfil(p) {
+  document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('role-'+p).classList.add('selected');
+  PERFIL = p;
+}
+
+function entrar() {
+  if(!PERFIL){showToast('Selecione um perfil');return;}
+  document.getElementById('login-overlay').style.display='none';
+  document.getElementById('user-badge').textContent = PERFIS[PERFIL].icone+' '+PERFIS[PERFIL].nome;
+  buildTabs();
+  adaptarCampos();
+  loadData();
+  subscribeRealtime();
+}
+
+function sair() {
+  PERFIL=null;
+  document.getElementById('login-overlay').style.display='flex';
+  document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('selected'));
+}
+
+function buildTabs() {
+  var tabs = PERFIS[PERFIL].tabs;
+  var labels = {
+    resumo:'📊 Resumo', fluxo:'📋 Fluxo de pedidos',
+    cadastro:'👥 Cadastro', 'novo-pedido':'➕ Novo pedido', 'novo-cliente':'👤 Novo cliente'
+  };
+  var html = '';
+  tabs.forEach((t,i)=>{
+    html += '<button class="tab'+(i===0?' active':'')+'" onclick="showTab(\''+t+'\')">'+labels[t]+'</button>';
+  });
+  document.getElementById('tabs-container').innerHTML = html;
+  showTab(tabs[0]);
+}
+
+function adaptarCampos() {
+  var campos = {
+    'campo-data-elaine': ['elaine','visualizador'],
+    'campo-data-eng': ['engenharia','elaine'],
+    'campo-data-rec': ['marindia','elaine'],
+    'campo-valor': ['marindia','elaine']
+  };
+  Object.keys(campos).forEach(id=>{
+    var el=document.getElementById(id);
+    if(el) el.style.display=campos[id].includes(PERFIL)?'flex':'none';
+  });
+}
+
+async function loadData() {
+  var {data:c} = await sb.from('clientes').select('*').order('nome');
+  var {data:p} = await sb.from('pedidos').select('*').order('created_at');
+  clientes = c||[];
+  pedidos = p||[];
+  populateSelect();
+  renderResumo();
+  renderFluxo();
+  renderCadastro();
+}
+
+function subscribeRealtime() {
+  sb.channel('changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'clientes'},()=>loadData())
+    .on('postgres_changes',{event:'*',schema:'public',table:'pedidos'},()=>loadData())
+    .subscribe();
+}
+
+function fmtBRL(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtPct(v){return Number(v||0).toFixed(2)+'%';}
+function fmtDate(d){if(!d)return'—';return d.split('-').reverse().join('/');}
+function fmtMes(m){if(!m)return'—';var p=m.split('-');var ms=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];return ms[parseInt(p[1])-1]+'/'+p[0].slice(2);}
+
+function getRecebido(cid){return pedidos.filter(p=>p.cliente_id==cid).reduce((s,p)=>s+(p.valor||0),0);}
+function getStatus(p){if(p.data_rec&&p.valor)return'Recebido';if(p.data_eng)return'Aguardando Recebimento';return'Aguardando Engenharia';}
+
+function showTab(t) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  var el=document.getElementById('tab-'+t);if(el)el.classList.add('active');
+  document.querySelectorAll('.tab').forEach(b=>{if(b.onclick&&b.onclick.toString().includes("'"+t+"'"))b.classList.add('active');});
+  buildEtapasGrid();
+}
+
+function renderResumo(){
+  var busca=(document.getElementById('busca-resumo')||{}).value||'';
+  var filtMes=(document.getElementById('filtro-mes-resumo')||{}).value||'';
+  var filtSt=(document.getElementById('filtro-st-resumo')||{}).value||'';
+  var tFin=0,tRec=0,tCli=0;
+  var rows='';
+  clientes.filter(c=>{
+    var okB=c.nome.toLowerCase().includes(busca.toLowerCase());
+    var okM=!filtMes||(c.mes_previsto||'').startsWith(filtMes);
+    var rec=getRecebido(c.id);
+    var pct=c.financiado>0?rec/c.financiado*100:0;
+    var okS=!filtSt||(filtSt==='concluido'?pct>=95:pct<95);
+    return okB&&okM&&okS;
+  }).forEach(c=>{
+    var rec=getRecebido(c.id);
+    var pct=c.financiado>0?rec/c.financiado*100:0;
+    var falta=Math.max(c.financiado-rec,0);
+    tFin+=c.financiado;tRec+=rec;tCli++;
+    var hoje=new Date().toISOString().slice(0,7);
+    var venc=c.mes_previsto&&c.mes_previsto<hoje&&pct<95;
+    rows+='<tr><td style="font-weight:600">'+c.nome+'</td><td style="color:#6b6a65">'+c.agencia+'</td>';
+    rows+='<td>'+fmtDate(c.data)+'</td>';
+    rows+='<td>'+(venc?'<span class="alerta">':'')+fmtMes(c.mes_previsto)+(venc?' ⚠</span>':'')+'</td>';
+    rows+='<td>'+fmtBRL(c.financiado)+'</td><td>'+(c.custas?fmtBRL(c.custas):'—')+'</td>';
+    rows+='<td style="color:#1a7a4a;font-weight:600">'+fmtBRL(totalRecCliente)+'</td>';
+    rows+='<td><span class="pct-bar"><span class="pct-fill" style="width:'+Math.min(pct,100)+'%"></span></span>'+fmtPct(pct)+'</td>';
+    rows+='<td style="color:#b86000">'+fmtBRL(falta)+'</td>';
+    rows+='<td><button class="btn-secondary btn-sm" onclick="abrirEditar('+c.id+')"><i class="ti ti-edit"></i></button></td></tr>';
+  });
+  var tb=document.getElementById('tbody-resumo');
+  if(tb)tb.innerHTML=rows||'<tr><td colspan="9" class="empty">Nenhum cliente</td></tr>';
+  var totPct=tFin>0?tRec/tFin*100:0;
+  var kf=document.getElementById('kpi-fin');if(kf)kf.textContent=fmtBRL(tFin);
+  var kr=document.getElementById('kpi-rec');if(kr)kr.textContent=fmtBRL(tRec);
+  var kp=document.getElementById('kpi-pct');if(kp)kp.textContent=fmtPct(totPct);
+  var kfa=document.getElementById('kpi-falta');if(kfa)kfa.textContent=fmtBRL(Math.max(tFin-tRec,0));
+  var kt=document.getElementById('kpi-total');if(kt)kt.textContent=tCli;
+}
+
+function renderFluxo(){
+  var busca=(document.getElementById('busca-fluxo')||{}).value||'';
+  var filtSt=(document.getElementById('filtro-st-fluxo')||{}).value||'';
+  var filtMes=(document.getElementById('filtro-mes-fluxo')||{}).value||'';
+  var rows='';
+  pedidos.filter(p=>{
+    var c=clientes.find(x=>x.id==p.cliente_id);
+    var nome=c?c.nome:'';
+    var st=getStatus(p);
+    return nome.toLowerCase().includes(busca.toLowerCase())&&(!filtSt||st===filtSt)&&(!filtMes||(p.mes_previsto||'').startsWith(filtMes));
+  }).sort((a,b)=>{var o=['Aguardando Engenharia','Aguardando Recebimento','Recebido'];return o.indexOf(getStatus(a))-o.indexOf(getStatus(b));})
+  .forEach(p=>{
+    var c=clientes.find(x=>x.id==p.cliente_id);
+    var nome=c?c.nome:'?';
+    var st=getStatus(p);
+    var rec=getRecebido(c?c.id:0);
+    var pct=c&&c.financiado>0?rec/c.financiado*100:0;
+    var badge=st==='Recebido'?'green':st==='Aguardando Recebimento'?'orange':'red';
+    var hoje=new Date().toISOString().slice(0,7);
+    var venc=p.mes_previsto&&p.mes_previsto<hoje&&st!=='Recebido';
+    rows+='<tr><td style="font-weight:600">'+nome+'</td>';
+    rows+='<td>'+(venc?'<span class="alerta">':'')+fmtMes(p.mes_previsto)+(venc?' ⚠</span>':'')+'</td>';
+    rows+='<td>'+fmtDate(p.data_elaine)+'</td><td>'+fmtDate(p.data_eng)+'</td>';
+    rows+='<td>'+fmtDate(p.data_rec)+'</td>';
+    rows+='<td>'+(p.valor?fmtBRL(p.valor):'—')+'</td>';
+    rows+='<td>'+fmtPct(pct)+'</td>';
+    rows+='<td><span class="badge '+badge+'">'+st+'</span></td>';
+    if(PERFIL!=='visualizador'){
+      rows+='<td><button class="btn-secondary btn-sm" onclick="editarPedido('+p.id+')"><i class="ti ti-edit"></i></button></td>';
+    } else { rows+='<td></td>'; }
+    rows+='</tr>';
+  });
+  var tb=document.getElementById('tbody-fluxo');
+  if(tb)tb.innerHTML=rows||'<tr><td colspan="9" class="empty">Nenhum pedido. Clique em "Novo pedido".</td></tr>';
+}
+
+function renderCadastro(){
+  var busca=(document.getElementById('busca-cad')||{}).value||'';
+  var rows='';
+  clientes.filter(c=>c.nome.toLowerCase().includes(busca.toLowerCase())).forEach(c=>{
+    var etapas=c.etapas||[];
+    var totalPct=etapas.reduce((s,v)=>s+(v||0),0);
+    var totalVal=c.financiado*totalPct/100;
+    var ativos=etapas.filter(e=>e>0).length;
+    rows+='<tr><td style="font-weight:600">'+c.nome+'</td><td>'+c.agencia+'</td>';
+    rows+='<td>'+fmtDate(c.data)+'</td><td>'+fmtMes(c.mes_previsto)+'</td>';
+    rows+='<td>'+fmtBRL(c.financiado)+'</td><td>'+(c.custas?fmtBRL(c.custas):'—')+'</td>';
+    rows+='<td>'+fmtBRL(totalVal)+'</td><td>'+ativos+'</td></tr>';
+  });
+  var tb=document.getElementById('tbody-cad');
+  if(tb)tb.innerHTML=rows||'<tr><td colspan="8" class="empty">Nenhum cliente cadastrado.</td></tr>';
+}
+
+function populateSelect(){
+  var sel=document.getElementById('np-cliente');if(!sel)return;
+  var val=sel.value;
+  sel.innerHTML='<option value="">Selecione o cliente...</option>';
+  clientes.sort((a,b)=>a.nome.localeCompare(b.nome)).forEach(c=>{
+    sel.innerHTML+='<option value="'+c.id+'">'+c.nome+'</option>';
+  });
+  if(val)sel.value=val;
+}
+
+function preencherInfoCliente(){
+  var cid=document.getElementById('np-cliente').value;
+  var box=document.getElementById('np-info-box');
+  if(!cid){box.style.display='none';return;}
+  var c=clientes.find(x=>x.id==cid);
+  if(!c){box.style.display='none';return;}
+  var rec=getRecebido(c.id);
+  var pct=c.financiado>0?rec/c.financiado*100:0;
+  if(c.mes_previsto){var el=document.getElementById('np-mes-previsto');if(el&&!el.value)el.value=c.mes_previsto;}
+  document.getElementById('np-info-txt').innerHTML=
+    '<strong>'+c.nome+'</strong><br>'+
+    'Assinatura: <strong>'+fmtDate(c.data)+'</strong> · Mês previsto: <strong>'+fmtMes(c.mes_previsto)+'</strong><br>'+
+    'Financiado: <strong>'+fmtBRL(c.financiado)+'</strong> · Custas: <strong>'+fmtBRL(c.custas||0)+'</strong><br>'+
+    'Já recebido: <strong>'+fmtBRL(rec)+'</strong> ('+fmtPct(pct)+') · Falta: <strong>'+fmtBRL(Math.max(c.financiado-rec,0))+'</strong>';
+  box.style.display='block';
+}
+
+async function salvarPedido(){
+  var cid=document.getElementById('np-cliente').value;
+  if(!cid){showToast('Selecione um cliente');return;}
+  var p={
+    cliente_id:parseInt(cid),
+    data_elaine:document.getElementById('np-data-elaine').value||null,
+    mes_previsto:document.getElementById('np-mes-previsto').value||null,
+    data_eng:document.getElementById('np-data-eng').value||null,
+    data_rec:document.getElementById('np-data-rec').value||null,
+    valor:parseFloat(document.getElementById('np-valor').value)||0
+  };
+  var btn=document.getElementById('btn-salvar-pedido');
+  btn.textContent='Salvando...';btn.disabled=true;
+  var {error}=await sb.from('pedidos').insert([p]);
+  btn.textContent='Salvar pedido';btn.disabled=false;
+  if(error){showToast('Erro: '+error.message);return;}
+  ['np-cliente','np-data-elaine','np-mes-previsto','np-data-eng','np-data-rec','np-valor'].forEach(id=>{var el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('np-info-box').style.display='none';
+  showToast('✓ Pedido salvo');
+  showTab('fluxo');
+}
+
+async function editarPedido(pid){
+  var p=pedidos.find(x=>x.id==pid);if(!p)return;
+  showTab('novo-pedido');
+  setTimeout(()=>{
+    document.getElementById('np-cliente').value=p.cliente_id;
+    document.getElementById('np-data-elaine').value=p.data_elaine||'';
+    document.getElementById('np-mes-previsto').value=p.mes_previsto||'';
+    document.getElementById('np-data-eng').value=p.data_eng||'';
+    document.getElementById('np-data-rec').value=p.data_rec||'';
+    document.getElementById('np-valor').value=p.valor||'';
+    preencherInfoCliente();
+    var btn=document.getElementById('btn-salvar-pedido');
+    btn.textContent='Atualizar pedido';
+    btn.onclick=async function(){
+      var upd={
+        data_elaine:document.getElementById('np-data-elaine').value||null,
+        mes_previsto:document.getElementById('np-mes-previsto').value||null,
+        data_eng:document.getElementById('np-data-eng').value||null,
+        data_rec:document.getElementById('np-data-rec').value||null,
+        valor:parseFloat(document.getElementById('np-valor').value)||0
+      };
+      var {error}=await sb.from('pedidos').update(upd).eq('id',pid);
+      if(error){showToast('Erro: '+error.message);return;}
+      btn.textContent='Salvar pedido';btn.onclick=salvarPedido;
+      showToast('✓ Pedido atualizado');showTab('fluxo');
+    };
+  },50);
+}
+
+function buildEtapasGrid(){
+  var g=document.getElementById('etapas-grid');if(!g||g.children.length>0)return;
+  for(var i=1;i<=11;i++){
+    g.innerHTML+='<div class="etapa-item"><label>% Etapa '+i+'</label><input type="number" id="nc-et-'+i+'" placeholder="0" step="0.01" oninput="calcEtapas()"><div class="etapa-valor" id="nc-val-'+i+'">—</div></div>';
+  }
+}
+
+function calcEtapas(){
+  var fin=parseFloat(document.getElementById('nc-fin').value)||0;
+  var total=0;
+  for(var i=1;i<=11;i++){
+    var pct=parseFloat((document.getElementById('nc-et-'+i)||{}).value)||0;
+    total+=pct;
+    var el=document.getElementById('nc-val-'+i);
+    if(el){el.textContent=pct>0&&fin>0?fmtBRL(fin*pct/100):'—';el.style.color=pct>0?'#1a7a4a':'#888781';}
+  }
+  var info=document.getElementById('pct-info');if(!info)return;
+  var fin2=parseFloat(document.getElementById('nc-fin').value)||0;
+  var cls=Math.abs(total-100)<0.1?'ok':total>100?'err':'info';
+  info.innerHTML='<div class="pct-total '+cls+'">Total: '+fmtPct(total)+' · Total a pedir: '+fmtBRL(fin2*total/100)+'</div>';
+}
+
+async function salvarCliente(){
+  var nome=document.getElementById('nc-nome').value.trim();
+  if(!nome){showToast('Informe o nome');return;}
+  var etapas=[];
+  for(var i=1;i<=11;i++)etapas.push(parseFloat((document.getElementById('nc-et-'+i)||{}).value)||0);
+  var c={
+    nome:nome.toUpperCase(),
+    agencia:document.getElementById('nc-agencia').value.trim().toUpperCase(),
+    data:document.getElementById('nc-data').value||null,
+    mes_previsto:document.getElementById('nc-mes').value||null,
+    financiado:parseFloat(document.getElementById('nc-fin').value)||0,
+    custas:parseFloat(document.getElementById('nc-custas').value)||0,
+    etapas:etapas
+  };
+  var {error}=await sb.from('clientes').insert([c]);
+  if(error){showToast('Erro: '+error.message);return;}
+  ['nc-nome','nc-agencia','nc-data','nc-mes','nc-fin','nc-custas'].forEach(id=>{var el=document.getElementById(id);if(el)el.value='';});
+  for(var i=1;i<=11;i++){var el=document.getElementById('nc-et-'+i);if(el)el.value='';}
+  document.getElementById('etapas-grid').innerHTML='';
+  document.getElementById('pct-info').innerHTML='';
+  showToast('✓ Cliente cadastrado');showTab('cadastro');
+}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+
+<div class="modal-overlay" id="modal-editar">
+  <div class="modal">
+    <h3><i class="ti ti-edit"></i> Editar cliente</h3>
+    <div class="form-grid">
+      <div class="form-group form-full"><label>Nome</label><input type="text" id="ed-nome" disabled style="background:#f5f5f0;color:#888"></div>
+      <div class="form-group"><label>Valor financiado (R$)</label><input type="number" id="ed-fin" step="0.01" oninput="calcEdEtapas()"></div>
+      <div class="form-group"><label>Custas (R$)</label><input type="number" id="ed-custas" step="0.01"></div>
+      <div class="form-group"><label>Agência</label><input type="text" id="ed-agencia"></div>
+      <div class="form-group"><label>Data assinatura</label><input type="date" id="ed-data"></div>
+      <div class="form-group"><label>Mês previsto</label><input type="month" id="ed-mes"></div>
+      <div class="form-full">
+        <div class="section-title" style="margin-bottom:6px;">% por etapa</div>
+        <div class="etapas-grid" id="ed-etapas-grid"></div>
+        <div id="ed-pct-info"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarEdicao()">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
