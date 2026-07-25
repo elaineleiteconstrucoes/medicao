@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root{
+    --azul:#1F3864; --azul2:#2E75B6; --claro:#EAF1F9;
+    --borda:#D5DEE9; --texto:#1B2430; --cinza:#6B7785;
+    --verde:#1E7A46; --amarelo:#FFF3CD; --vermelho:#B42318;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#F4F6F9;color:var(--texto);font-size:15px}
+  header{background:var(--azul);color:#fff;padding:12px 14px;position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:10px}
+  header h1{font-size:16px;margin:0;flex:1;font-weight:bold}
+  .btn-voltar{background:rgba(255,255,255,.15);border:0;color:#fff;font-size:20px;
+    width:34px;height:34px;border-radius:8px;cursor:pointer}
+  nav{display:flex;background:#fff;border-bottom:1px solid var(--borda);
+    overflow-x:auto;position:sticky;top:58px;z-index:19}
+  nav button{flex:1;min-width:88px;border:0;background:none;padding:12px 6px;font-size:13px;
+    color:var(--cinza);cursor:pointer;border-bottom:3px solid transparent;font-family:inherit}
+  nav button.on{color:var(--azul);border-bottom-color:var(--azul2);font-weight:bold}
+  main{padding:12px 12px 90px}
+  .card{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:14px;margin-bottom:12px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--azul);text-transform:uppercase;letter-spacing:.4px}
+  .obra{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .obra .nome{flex:1;font-weight:bold}
+  .obra .sub{font-size:12px;color:var(--cinza);font-weight:normal;margin-top:3px}
+  label{display:block;font-size:12px;color:var(--cinza);margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:11px;border:1px solid var(--borda);border-radius:8px;
+    font-size:16px;font-family:inherit;background:#fff}
+  input:focus,select:focus{outline:2px solid var(--azul2);border-color:var(--azul2)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
+  button.acao{background:var(--azul2);color:#fff;border:0;border-radius:9px;padding:13px 16px;
+    font-size:15px;font-weight:bold;cursor:pointer;font-family:inherit;width:100%}
+  button.sec{background:#fff;color:var(--azul);border:1px solid var(--azul2)}
+  button.perigo{background:#fff;color:var(--vermelho);border:1px solid var(--vermelho)}
+  .barra-fixa{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--borda);
+    padding:10px 12px;display:flex;gap:8px;z-index:25}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:var(--claro);color:var(--azul);text-align:left;padding:8px 6px;font-size:11px;
+    text-transform:uppercase}
+  td{padding:9px 6px;border-top:1px solid var(--borda);vertical-align:middle}
+  td.num,th.num{text-align:right;white-space:nowrap}
+  .total{background:var(--claro);font-weight:bold}
+  .tag{display:inline-block;padding:4px 9px;border-radius:20px;font-size:11px;font-weight:bold}
+  .tag.pago{background:#E3F5EA;color:var(--verde)}
+  .tag.pend{background:var(--amarelo);color:#8A6100}
+  .etapa{border:1px solid var(--borda);border-radius:9px;padding:11px;margin-bottom:9px}
+  .etapa .lin1{display:flex;align-items:center;gap:8px}
+  .etapa .nome{flex:1;font-weight:bold;font-size:14px}
+  .etapa .base{font-size:11px;color:var(--cinza);margin:5px 0}
+  .etapa .valor{font-size:17px;font-weight:bold;color:var(--azul)}
+  .num-etapa{width:26px;height:26px;border-radius:50%;background:var(--azul);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex:none}
+  .kpi{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+  .kpi div{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:11px}
+  .kpi span{display:block;font-size:11px;color:var(--cinza);text-transform:uppercase}
+  .kpi b{font-size:17px;color:var(--azul)}
+  .aviso{background:var(--amarelo);border:1px solid #E7C86A;border-radius:8px;padding:10px;
+    font-size:13px;margin-bottom:12px}
+  .erro{background:#FDECEA;border:1px solid #E7A29B;color:var(--vermelho)}
+  .carregando{text-align:center;padding:40px;color:var(--cinza)}
+  .vazio{text-align:center;padding:34px 12px;color:var(--cinza)}
+  .qr td:first-child{background:var(--claro);font-weight:bold;width:40%}
+  .linha-amb{display:grid;grid-template-columns:1fr 90px 34px;gap:6px;margin-bottom:6px;align-items:center}
+  .linha-amb button{border:1px solid var(--borda);background:#fff;border-radius:7px;height:42px;cursor:pointer}
+  @media print{
+    header,nav,.barra-fixa,.noprint{display:none!important}
+    main{padding:0}
+    .card{border:0}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="btn-voltar" id="btVoltar" onclick="irLista()" style="display:none">&#8592;</button>
+  <h1 id="tituloTopo">Sistema EL</h1>
+</header>
+
+<nav id="abas" style="display:none">
+  <button data-v="dados" onclick="abrir('dados')">Dados</button>
+  <button data-v="material" onclick="abrir('material')">Material</button>
+  <button data-v="medicao" onclick="abrir('medicao')">Medi&ccedil;&atilde;o</button>
+  <button data-v="contrato" onclick="abrir('contrato')">Contrato</button>
+</nav>
+
+<main id="tela"><div class="carregando">Carregando...</div></main>
+
+<script>
+var OBRA = null;
+var PARAMS = [];
+var VIEW = 'lista';
+
+function $(id){ return document.getElementById(id); }
+function br(v){
+  v = Number(v)||0;
+  return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function rs(v){ return 'R$ ' + br(v); }
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ---------------- inicializacao ---------------- */
+window.addEventListener('load', function(){
+  google.script.run.withSuccessHandler(function(p){ PARAMS = p; irLista(); })
+    .withFailureHandler(falhou).getParametros();
+});
+
+function falhou(e){
+  $('tela').innerHTML = '<div class="aviso erro">Erro: ' + esc(e && e.message ? e.message : e) + '</div>';
+}
+
+/* ---------------- lista de obras ---------------- */
+function irLista(){
+  VIEW = 'lista';
+  OBRA = null;
+  $('abas').style.display = 'none';
+  $('btVoltar').style.display = 'none';
+  $('tituloTopo').textContent = 'Minhas obras';
+  $('tela').innerHTML = '<div class="carregando">Carregando obras...</div>';
+  google.script.run.withSuccessHandler(renderLista).withFailureHandler(falhou).listarObras();
+}
+
+function renderLista(lista){
+  var h = '';
+  if(!lista.length){
+    h += '<div class="vazio">Nenhuma obra cadastrada ainda.<br>Toque em <b>Nova obra</b> para come&ccedil;ar.</div>';
+  } else {
+    for(var i=0;i<lista.length;i++){
+      var o = lista[i];
+      h += '<div class="card obra" onclick="carregarObra(\'' + o.id + '\')">' +
+             '<div class="nome">' + esc(o.cliente || '(sem cliente)') +
+               '<div class="sub">' + esc(o.endereco) + '</div>' +
+               '<div class="sub">' + rs(o.vlr_contrato) + '</div>' +
+             '</div><div style="color:#2E75B6;font-size:22px">&#8250;</div></div>';
+    }
+  }
+  h += '<div class="card"><h3>Ajustes</h3>' +
+       '<button class="acao sec" onclick="abrirParametros()">Par&acirc;metros e pre&ccedil;os</button></div>';
+  $('tela').innerHTML = h;
+  $('tela').insertAdjacentHTML('beforeend',
+    '<div class="barra-fixa"><button class="acao" onclick="novaObra()">+ Nova obra</button></div>');
+}
+
+function novaObra(){
+  google.script.run.withSuccessHandler(function(o){
+    OBRA = o; entrarObra();
+  }).withFailureHandler(falhou).novaObraPadrao();
+}
+
+function carregarObra(id){
+  $('tela').innerHTML = '<div class="carregando">Abrindo obra...</div>';
+  google.script.run.withSuccessHandler(function(o){
+    OBRA = o; entrarObra();
+  }).withFailureHandler(falhou).getObra(id);
+}
+
+function entrarObra(){
+  $('abas').style.display = 'flex';
+  $('btVoltar').style.display = 'block';
+  $('tituloTopo').textContent = OBRA.cliente || 'Nova obra';
+  abrir('dados');
+}
+
+function abrir(v){
+  VIEW = v;
+  var bs = document.querySelectorAll('nav button');
+  for(var i=0;i<bs.length;i++) bs[i].className = (bs[i].getAttribute('data-v')===v?'on':'');
+  if(v==='dados') telaDados();
+  if(v==='material') telaMaterial();
+  if(v==='medicao') telaMedicao();
+  if(v==='contrato') telaContrato();
+}
+
+/* ---------------- tela DADOS ---------------- */
+function campo(rot, k, tipo){
+  var v = OBRA[k];
+  if(v===null||v===undefined) v='';
+  return '<label>' + rot + '</label><input id="f_' + k + '" type="' +
+         (tipo||'number') + '" ' + (tipo?'':'step="any" inputmode="decimal"') +
+         ' value="' + esc(v) + '">';
+}
+
+function telaDados(){
+  var h = '';
+  h += '<div class="card"><h3>Identifica&ccedil;&atilde;o</h3>' +
+       campo('Cliente','cliente','text') +
+       campo('Endere&ccedil;o da obra','endereco','text') +
+       campo('Cidade','cidade','text') +
+       '<div class="grid2">' + campo('N&ordm; do contrato','contrato','text') +
+       campo('Data','data','text') + '</div></div>';
+
+  h += '<div class="card"><h3>Dimens&otilde;es da casa</h3>' +
+       '<div class="grid2">' +
+       campo('&Aacute;rea interna (m&sup2;)','area_interna') +
+       campo('Per&iacute;metro externo (m)','perim_ext') +
+       campo('Parede N&Atilde;O divisa (m)','comp_nd') +
+       campo('Parede DIVISA (m)','comp_div') +
+       campo('Altura da parede (m)','alt_parede') +
+       campo('Compr. do eit&atilde;o (m)','comp_eitao') +
+       campo('Altura do eit&atilde;o (m)','alt_eitao') +
+       campo('Parede sobre o WC (m)','comp_wc') +
+       campo('Altura sobre o WC (m)','alt_wc') +
+       campo('&Aacute;rea da laje (m&sup2;)','area_laje') +
+       campo('Per&iacute;metro da laje (m)','perim_laje') +
+       campo('Espessura da laje (m)','esp_laje') +
+       '</div></div>';
+
+  h += '<div class="card"><h3>V&atilde;os</h3><div class="grid3">' +
+       campo('Portas (un)','qt_porta') +
+       campo('V&atilde;o porta (m)','vao_porta') +
+       campo('Alt. porta (m)','alt_porta') +
+       campo('Vitr&ocirc;s (un)','qt_vitro') +
+       campo('V&atilde;o vitr&ocirc; (m)','vao_vitro') +
+       campo('Alt. vitr&ocirc; (m)','alt_vitro') +
+       '</div>' + campo('Esquadrias / batentes (un)','qt_esq') + '</div>';
+
+  h += '<div class="card"><h3>Funda&ccedil;&atilde;o e pilares</h3><div class="grid3">' +
+       campo('Brocas (un)','qt_broca') +
+       campo('Di&acirc;metro (m)','diam_broca') +
+       campo('Profundidade (m)','prof_broca') +
+       campo('Larg. baldrame (m)','larg_bald') +
+       campo('Alt. baldrame (m)','alt_bald') +
+       campo('Pilares (un)','qt_pilar') +
+       campo('Pilar lado A (m)','pilar_a') +
+       campo('Pilar lado B (m)','pilar_b') +
+       campo('Negativo beiral (m)','comp_neg') +
+       '</div></div>';
+
+  h += '<div class="card"><h3>Muros</h3><div class="grid3">' +
+       campo('Muro 2,40 m (m)','muro240') +
+       campo('Muro 1,80 m (m)','muro180') +
+       campo('Muro varanda (m&sup2;)','muro_var') +
+       '</div></div>';
+
+  h += '<div class="card"><h3>Pisos e acabamento</h3><div class="grid2">' +
+       campo('Contrapiso (m&sup2;)','area_contra') +
+       campo('Impermeabilizante (m&sup2;)','area_imp') +
+       campo('Testada do lote (m)','testada') +
+       campo('Larg. cal&ccedil;ada frontal (m)','larg_cf') +
+       campo('Per&iacute;m. cal&ccedil;ada volta (m)','perim_cv') +
+       campo('Larg. cal&ccedil;ada volta (m)','larg_cv') +
+       campo('&Aacute;rea de gesso (m&sup2;)','area_gesso') +
+       campo('&Aacute;rea de piso (m&sup2;)','area_piso') +
+       campo('Revestimento parede (m&sup2;)','area_rev') +
+       '</div></div>';
+
+  h += '<div class="card"><h3>Ambientes (massa corrida)</h3>' +
+       '<div style="font-size:12px;color:#6B7785;margin-bottom:8px">' +
+       'F&oacute;rmula: por ambiente RAIZ(&aacute;rea) &times; 4 &times; 3, soma tudo, ' +
+       'soma as &aacute;reas e divide por 20.</div>' +
+       '<div id="ambientes"></div>' +
+       '<button class="acao sec" onclick="addAmb()" style="margin-top:6px">+ Ambiente</button></div>';
+
+  h += '<div class="card"><h3>Contrato do pedreiro</h3>' +
+       campo('Nome do pedreiro','ped_nome','text') +
+       '<div class="grid2">' + campo('CPF / CNPJ','ped_doc','text') +
+       campo('Prazo (dias)','prazo') + '</div>' +
+       campo('Endere&ccedil;o do pedreiro','ped_end','text') +
+       '<div class="grid2">' + campo('Valor contratado (R$)','vlr_contrato') +
+       campo('Data de in&iacute;cio','dt_inicio','text') + '</div></div>';
+
+  if(OBRA.id){
+    h += '<div class="card"><button class="acao perigo" onclick="excluir()">Excluir esta obra</button></div>';
+  }
+
+  h += '<div class="barra-fixa">' +
+       '<button class="acao" onclick="salvar()">Salvar e calcular</button></div>';
+
+  $('tela').innerHTML = h;
+  desenhaAmbientes();
+}
+
+function desenhaAmbientes(){
+  var amb = OBRA.ambientes || [];
+  if(!amb.length) amb = [{nome:'',area:''}];
+  OBRA.ambientes = amb;
+  var h = '';
+  for(var i=0;i<amb.length;i++){
+    h += '<div class="linha-amb">' +
+         '<input type="text" placeholder="Ambiente" value="' + esc(amb[i].nome) +
+         '" oninput="setAmb(' + i + ',\'nome\',this.value)">' +
+         '<input type="number" step="any" inputmode="decimal" placeholder="m&sup2;" value="' +
+         esc(amb[i].area) + '" oninput="setAmb(' + i + ',\'area\',this.value)">' +
+         '<button onclick="delAmb(' + i + ')">&times;</button></div>';
+  }
+  $('ambientes').innerHTML = h;
+}
+function setAmb(i,k,v){ OBRA.ambientes[i][k] = v; }
+function addAmb(){ OBRA.ambientes.push({nome:'',area:''}); desenhaAmbientes(); }
+function delAmb(i){
+  OBRA.ambientes.splice(i,1);
+  if(!OBRA.ambientes.length) OBRA.ambientes.push({nome:'',area:''});
+  desenhaAmbientes();
+}
+
+function coletar(){
+  var texto = {cliente:1,endereco:1,cidade:1,contrato:1,data:1,
+               ped_nome:1,ped_doc:1,ped_end:1,dt_inicio:1};
+  for(var k in OBRA){
+    var el = $('f_'+k);
+    if(!el) continue;
+    OBRA[k] = texto[k] ? el.value : (parseFloat(el.value)||0);
+  }
+}
+
+function salvar(){
+  coletar();
+  if(!OBRA.cliente){ alert('Preencha o nome do cliente.'); return; }
+  $('tela').innerHTML = '<div class="carregando">Salvando e calculando...</div>';
+  google.script.run.withSuccessHandler(function(id){
+    OBRA.id = id;
+    $('tituloTopo').textContent = OBRA.cliente;
+    abrir('material');
+  }).withFailureHandler(falhou).salvarObra(OBRA);
+}
+
+function excluir(){
+  if(!confirm('Excluir a obra de ' + OBRA.cliente + '? Isso apaga material e medi\u00e7\u00e3o dela.')) return;
+  google.script.run.withSuccessHandler(irLista).withFailureHandler(falhou).excluirObra(OBRA.id);
+}
+
+/* ---------------- tela MATERIAL ---------------- */
+function telaMaterial(){
+  if(!OBRA.id){ $('tela').innerHTML = '<div class="aviso">Salve a obra primeiro na aba Dados.</div>'; return; }
+  $('tela').innerHTML = '<div class="carregando">Calculando...</div>';
+  google.script.run.withSuccessHandler(renderMaterial).withFailureHandler(falhou).calcularObra(OBRA.id);
+}
+
+function renderMaterial(d){
+  var r = d.calc;
+  var h = '';
+  h += '<div class="kpi">' +
+       '<div><span>Blocos</span><b>' + br(r.bl_total) + '</b></div>' +
+       '<div><span>Cimento</span><b>' + br(r.cim_total) + ' sc</b></div>' +
+       '<div><span>Alvenaria da casa</span><b>' + br(r.a_casa) + ' m&sup2;</b></div>' +
+       '<div><span>Reboco total</span><b>' + br(r.a_reb) + ' m&sup2;</b></div></div>';
+
+  if(!r.total_material){
+    h += '<div class="aviso">Pre&ccedil;os ainda n&atilde;o preenchidos. ' +
+         'Abra <b>Par&acirc;metros e pre&ccedil;os</b> na tela inicial para ver o valor total.</div>';
+  }
+
+  h += '<div class="card"><h3>Lista de compras</h3><table><tr>' +
+       '<th>Material</th><th class="num">Calc.</th><th class="num">Comprar</th>' +
+       '<th class="num">Total</th></tr>';
+  for(var i=0;i<r.materiais.length;i++){
+    var m = r.materiais[i];
+    if(!m.comprar) continue;
+    h += '<tr><td>' + esc(m.material) + '<div style="font-size:11px;color:#6B7785">' +
+         esc(m.unidade) + '</div></td>' +
+         '<td class="num">' + br(m.qtd) + '</td>' +
+         '<td class="num"><b>' + br(m.comprar) + '</b></td>' +
+         '<td class="num">' + (m.total ? br(m.total) : '-') + '</td></tr>';
+  }
+  h += '<tr class="total"><td colspan="3">TOTAL</td><td class="num">' +
+       br(r.total_material) + '</td></tr></table>' +
+       '<div style="font-size:11px;color:#6B7785;margin-top:8px">' +
+       'A coluna Comprar j&aacute; inclui a quebra e arredonda pra cima nos itens por unidade.</div></div>';
+
+  h += '<div class="card"><h3>Memoria de calculo</h3><table>' +
+       lin('Blocos em p&eacute;', br(r.bl_pe) + ' un') +
+       lin('Blocos deitados', br(r.bl_deit) + ' un') +
+       lin('Canaletas 9x19x39', br(r.canaleta) + ' un') +
+       lin('P&oacute; de mico', br(r.pomico) + ' un') +
+       lin('Areia mista (assentamento)', br(r.ar_mista) + ' m&sup3;') +
+       lin('Concreto usinado (brocas + baldrame)', br(r.usinado) + ' m&sup3;') +
+       lin('&Aacute;rea de chapisco', br(r.a_chap) + ' m&sup2;') +
+       lin('Reboco externo', br(r.a_reb_ext) + ' m&sup2;') +
+       lin('Reboco interno', br(r.a_reb_int) + ' m&sup2;') +
+       lin('Ferro 6 mm', br(r.m_f6) + ' m') +
+       lin('Ferro 8 mm', br(r.m_f8) + ' m') +
+       lin('Ferro 10 mm', br(r.m_f10) + ' m') +
+       lin('Gesso', br(r.gesso) + ' sacos') +
+       lin('Massa corrida', br(r.massa) + ' sacos') +
+       '</table></div>';
+
+  h += '<div class="barra-fixa noprint">' +
+       '<button class="acao sec" onclick="window.print()">Imprimir</button>' +
+       '<button class="acao" onclick="abrir(\'medicao\')">Ver medi&ccedil;&atilde;o</button></div>';
+  $('tela').innerHTML = h;
+}
+
+function lin(a,b){
+  return '<tr><td>' + a + '</td><td class="num">' + b + '</td></tr>';
+}
+
+/* ---------------- tela MEDICAO ---------------- */
+function telaMedicao(){
+  if(!OBRA.id){ $('tela').innerHTML = '<div class="aviso">Salve a obra primeiro na aba Dados.</div>'; return; }
+  $('tela').innerHTML = '<div class="carregando">Carregando medi&ccedil;&atilde;o...</div>';
+  google.script.run.withSuccessHandler(renderMedicao).withFailureHandler(falhou).resumoMedicao(OBRA.id);
+}
+
+function renderMedicao(m){
+  var h = '';
+  h += '<div class="kpi">' +
+       '<div><span>Total das etapas</span><b>' + rs(m.total) + '</b></div>' +
+       '<div><span>Pago</span><b style="color:#1E7A46">' + rs(m.pago) + '</b></div>' +
+       '<div><span>Pendente</span><b>' + rs(m.pendente) + '</b></div>' +
+       '<div><span>Saldo l&iacute;quido</span><b>' + rs(m.saldo_liquido) + '</b></div></div>';
+
+  if(m.deducao_gesso){
+    h += '<div class="aviso">Dedu&ccedil;&atilde;o do gesso j&aacute; considerada no saldo l&iacute;quido: ' +
+         rs(m.deducao_gesso) + '</div>';
+  }
+
+  h += '<div class="card"><h3>Etapas</h3>';
+  for(var i=0;i<m.etapas.length;i++){
+    var e = m.etapas[i];
+    var pago = (e.status === 'PAGO');
+    h += '<div class="etapa">' +
+         '<div class="lin1"><div class="num-etapa">' + e.etapa + '</div>' +
+         '<div class="nome">' + esc(e.servico) + '</div>' +
+         '<span class="tag ' + (pago?'pago">PAGO':'pend">PENDENTE') + '</span></div>' +
+         '<div class="base">' + esc(e.base) + '</div>' +
+         '<div class="lin1"><div class="valor">' + rs(e.valor) + '</div>' +
+         (e.pago ? '<div style="font-size:12px;color:#6B7785">pago em ' + esc(e.pago) + '</div>' : '') +
+         '</div>' +
+         '<button class="acao ' + (pago?'sec':'') + '" style="margin-top:8px" ' +
+         'onclick="marcar(' + e.etapa + ',\'' + (pago?'PENDENTE':'PAGO') + '\')">' +
+         (pago ? 'Desmarcar' : 'Marcar como PAGO') + '</button></div>';
+  }
+  h += '</div>';
+  h += '<div class="barra-fixa noprint">' +
+       '<button class="acao sec" onclick="window.print()">Imprimir</button>' +
+       '<button class="acao" onclick="abrir(\'contrato\')">Ver contrato</button></div>';
+  $('tela').innerHTML = h;
+}
+
+function marcar(etapa, status){
+  google.script.run.withSuccessHandler(function(){
+    telaMedicao();
+  }).withFailureHandler(falhou).atualizarEtapa(OBRA.id, etapa, 'status', status);
+}
+
+/* ---------------- tela CONTRATO ---------------- */
+function telaContrato(){
+  if(!OBRA.id){ $('tela').innerHTML = '<div class="aviso">Salve a obra primeiro na aba Dados.</div>'; return; }
+  $('tela').innerHTML = '<div class="carregando">Montando contrato...</div>';
+  google.script.run.withSuccessHandler(renderContrato).withFailureHandler(falhou).dadosContrato(OBRA.id);
+}
+
+function renderContrato(c){
+  var h = '<div class="card"><h3>Quadro Resumo</h3><table class="qr">' +
+    qr('CONTRATANTE', c.contratante) +
+    qr('CONTRATADO', c.contratado) +
+    qr('CPF / CNPJ', c.documento) +
+    qr('ENDERE&Ccedil;O DO CONTRATADO', c.endereco_contratado) +
+    qr('OBRA', c.obra) +
+    qr('CIDADE', c.cidade) +
+    qr('CLIENTE', c.cliente) +
+    qr('N&ordm; DO CONTRATO', c.contrato) +
+    qr('OBJETO', 'Execu&ccedil;&atilde;o, em regime de empreitada de m&atilde;o de obra, dos ' +
+       'servi&ccedil;os de funda&ccedil;&atilde;o, alvenaria, laje, reboco, muros, contrapiso e ' +
+       'acabamentos da resid&ecirc;ncia acima identificada, conforme as etapas do cronograma.') +
+    qr('VALOR TOTAL', rs(c.valor)) +
+    qr('DEDU&Ccedil;&Atilde;O DO GESSO', rs(c.deducao)) +
+    qr('VALOR L&Iacute;QUIDO', rs(c.liquido)) +
+    qr('FORMA DE PAGAMENTO', 'Por medi&ccedil;&atilde;o, conforme as 13 etapas do cronograma abaixo, ' +
+       'paga em at&eacute; 5 (cinco) dias &uacute;teis ap&oacute;s a confer&ecirc;ncia e o aceite de ' +
+       'cada etapa pela CONTRATANTE.') +
+    qr('PRAZO DE EXECU&Ccedil;&Atilde;O', esc(c.prazo) + ' dias') +
+    qr('DATA DE IN&Iacute;CIO', c.inicio) +
+    qr('MATERIAIS', 'Fornecidos integralmente pela CONTRATANTE.') +
+    qr('FORO', 'Comarca de ' + esc(c.cidade)) +
+    '</table></div>';
+
+  h += '<div class="card"><h3>Cronograma de medi&ccedil;&atilde;o</h3><table>' +
+       '<tr><th>#</th><th>Servi&ccedil;o</th><th class="num">Valor</th></tr>';
+  var t = 0;
+  for(var i=0;i<c.etapas.length;i++){
+    t += c.etapas[i].valor;
+    h += '<tr><td>' + c.etapas[i].etapa + '</td><td>' + esc(c.etapas[i].servico) +
+         '</td><td class="num">' + br(c.etapas[i].valor) + '</td></tr>';
+  }
+  h += '<tr class="total"><td colspan="2">TOTAL</td><td class="num">' + br(t) +
+       '</td></tr></table></div>';
+
+  h += '<div class="card" style="text-align:center;padding-top:40px">' +
+       '<div style="display:flex;gap:30px;justify-content:space-between;font-size:12px">' +
+       '<div style="flex:1">_______________________________<br><b>' + esc(c.contratante) +
+       '</b><br>CONTRATANTE</div>' +
+       '<div style="flex:1">_______________________________<br><b>' + esc(c.contratado) +
+       '</b><br>CONTRATADO</div></div></div>';
+
+  h += '<div class="barra-fixa noprint">' +
+       '<button class="acao" onclick="window.print()">Imprimir / Salvar PDF</button></div>';
+  $('tela').innerHTML = h;
+}
+
+function qr(a,b){
+  return '<tr><td>' + a + '</td><td>' + (b||'') + '</td></tr>';
+}
+
+/* ---------------- tela PARAMETROS ---------------- */
+function abrirParametros(){
+  $('tituloTopo').textContent = 'Par&acirc;metros e pre&ccedil;os';
+  $('btVoltar').style.display = 'block';
+  $('abas').style.display = 'none';
+  var grupos = {}, ordem = [];
+  for(var i=0;i<PARAMS.length;i++){
+    var g = PARAMS[i].grupo || 'Outros';
+    if(!grupos[g]){ grupos[g] = []; ordem.push(g); }
+    grupos[g].push(PARAMS[i]);
+  }
+  var h = '';
+  for(var k=0;k<ordem.length;k++){
+    var g = ordem[k];
+    h += '<div class="card"><h3>' + esc(g) + '</h3>';
+    for(var j=0;j<grupos[g].length;j++){
+      var p = grupos[g][j];
+      h += '<label>' + esc(p.descricao) + ' <span style="color:#98A2B3">(' +
+           esc(p.unidade) + ')</span></label>' +
+           '<input id="p_' + p.chave + '" type="number" step="any" inputmode="decimal" value="' +
+           p.valor + '">';
+    }
+    h += '</div>';
+  }
+  h += '<div class="barra-fixa"><button class="acao" onclick="salvarParams()">Salvar par&acirc;metros</button></div>';
+  $('tela').innerHTML = h;
+}
+
+function salvarParams(){
+  var obj = {};
+  for(var i=0;i<PARAMS.length;i++){
+    var el = $('p_' + PARAMS[i].chave);
+    if(el){
+      obj[PARAMS[i].chave] = parseFloat(el.value) || 0;
+      PARAMS[i].valor = obj[PARAMS[i].chave];
+    }
+  }
+  $('tela').innerHTML = '<div class="carregando">Salvando...</div>';
+  google.script.run.withSuccessHandler(function(){ irLista(); })
+    .withFailureHandler(falhou).salvarParametros(obj);
+}
+</script>
+</body>
+</html>
